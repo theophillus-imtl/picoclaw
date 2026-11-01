@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/ergochat/readline"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/sipeed/picoclaw/pkg/agent"
 	"github.com/sipeed/picoclaw/pkg/bus"
 	"github.com/sipeed/picoclaw/pkg/logger"
+	"github.com/sipeed/picoclaw/pkg/media"
 	"github.com/sipeed/picoclaw/pkg/providers"
 )
 
@@ -53,6 +55,15 @@ func agentCmd(message, sessionKey, model string, debug bool) error {
 	defer msgBus.Close()
 	agentLoop := agent.NewAgentLoop(cfg, msgBus, provider)
 	defer agentLoop.Close()
+
+	mediaStore := media.NewFileMediaStoreWithCleanup(media.MediaCleanerConfig{
+		Enabled:  cfg.Tools.MediaCleanup.Enabled,
+		MaxAge:   time.Duration(cfg.Tools.MediaCleanup.MaxAge) * time.Minute,
+		Interval: time.Duration(cfg.Tools.MediaCleanup.Interval) * time.Minute,
+	})
+	mediaStore.Start()
+	defer mediaStore.Stop()
+	agentLoop.SetMediaStore(mediaStore)
 
 	// Print agent startup info (only for interactive mode)
 	startupInfo := agentLoop.GetStartupInfo()
