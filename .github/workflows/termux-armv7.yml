@@ -5,6 +5,7 @@ on:
     paths:
       - "pkg/tools/**"
       - "pkg/providers/openai_compat/**"
+      - "cmd/picoclaw/internal/agent/**"
       - ".github/workflows/termux-armv7.yml"
   workflow_dispatch:
 
