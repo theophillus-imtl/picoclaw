@@ -1,0 +1,55 @@
+name: graphify
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "graphify-out/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: graphify
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Graphify
+        run: pip install graphifyy
+
+      # AST-only build: no LLM, no API key, no tokens.
+      # If clustering ever errors, change to: graphify update . --no-cluster
+      - name: Build graph
+        run: graphify update .
+
+      - name: Commit graph
+        run: |
+          SIZE=$(stat -c%s graphify-out/graph.json)
+          if [ "$SIZE" -gt 50000000 ]; then
+            echo "graph.json is over 50 MB, not committing it"
+            exit 0
+          fi
+          cat > graphify-out/README.md <<'EOF'
+          # Code graph (auto-generated)
+          Built by GitHub Actions from this repo's source. Use it instead of reading every file:
+          1. Read GRAPH_REPORT.md for the main concepts and how they connect.
+          2. Search graph.json for the function, class or file you need and follow its edges to see what calls it and what it calls.
+          3. Open source files only at the lines the graph points to.
+          Edges tagged EXTRACTED come straight from the code; INFERRED or AMBIGUOUS are guesses. The graph can lag the latest commit, so read the file itself if something looks off.
+          EOF
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add -f graphify-out/graph.json graphify-out/README.md
+          [ -f graphify-out/GRAPH_REPORT.md ] && git add -f graphify-out/GRAPH_REPORT.md
+          git diff --cached --quiet || (git commit -m "graphify: update code graph" && git push)
